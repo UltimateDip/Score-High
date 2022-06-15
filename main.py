@@ -1,3 +1,5 @@
+from multiprocessing import process
+from multiprocessing.dummy import Process
 import turtle
 
 
@@ -44,11 +46,19 @@ ball.shape("circle")
 ball.color("green")
 ball.setposition(-50,-90)
 
-
+# Scorebox
+scoreBox = turtle.Turtle()
+scoreBox.hideturtle()
+scoreBox.penup()
+scoreBox.speed(0)
+scoreBox.setposition(100,200)
+scoreStyle = ("Normal",20,"italic")
+scoreValue = "Score High"
+scoreBox.write(scoreValue,font=scoreStyle)
 
 
 ################ Jumping physics ###################### 
-# ball.velocity=10
+
 ball.jumpHeight = 0
 ball.g = 9.81
 ball.u = 0
@@ -59,20 +69,29 @@ def setVelocity(h):
     ball.u = (2*(ball.g)*h)**0.5    # u = root(2gh)
     ball.jumpHeight = h
 
-
+##################### Update the scoreboard ####################
+def updateScore(newScore):
+    global scoreValue
+    if scoreValue=="Score High":
+        scoreValue = newScore
+    else:
+        scoreValue+=newScore
+    if scoreValue % 100 < 10 :
+        scoreBox.clear()
+        scoreBox.write(scoreValue,font=scoreStyle)
 
 
 ##################### Functionality ############################
 def moveRight():
-    mainLine.speed(mainLineSpeed)
+    # mainLine.speed(mainLineSpeed)
     mainLine.forward(10)
 
 
 def moveBall():
 
     ########## LOGIC  ##########
-    ball.time+=0.6
-    s = (ball.u)*(ball.time) - 0.5*ball.g*(ball.time**2)
+    ball.time+=0.4
+    s = (ball.u)*(ball.time) - 0.5*(ball.g)*(ball.time**2)
 
 
     ########## When ball hits ground again  ##########
@@ -109,11 +128,10 @@ for num in range(10):
 
 
 
-
 while True:
     moveRight()
     moveBall()
-
+    updateScore(ball.time)
     
     x=mainLine.xcor()
     # reset the mainLine to rightmost side

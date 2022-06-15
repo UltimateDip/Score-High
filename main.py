@@ -72,10 +72,19 @@ def setVelocity(h):
 ##################### Update the scoreboard ####################
 def updateScore(newScore):
     global scoreValue
+    # If it is in initial state then simple set the new value
     if scoreValue=="Score High":
         scoreValue = newScore
-    else:
+    else: # else add the new value of score to existing score
         scoreValue+=newScore
+
+    # Currently using this condition for some perfomance improvement
+    # without this if we don't do the check and run the clear() and 
+    # write() in every updateScore() it seems it drops fps of our 
+    # simulation. 
+
+    ### THIS IS A TEMPORARY SOLUTION OF A SERIOUS PROBLEM. NEED TO ##
+    ### FIND SOME ALTERNATIVE TO SOLVE THIS ISSUE ###################
     if scoreValue % 100 < 10 :
         scoreBox.clear()
         scoreBox.write(scoreValue,font=scoreStyle)
@@ -131,8 +140,9 @@ for num in range(10):
 while True:
     moveRight()
     moveBall()
+
+    # update the scoreboard
     updateScore(ball.time)
-    
     x=mainLine.xcor()
     # reset the mainLine to rightmost side
     if x < -windowWidth:

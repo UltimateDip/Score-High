@@ -1,5 +1,5 @@
-from multiprocessing import process
-from multiprocessing.dummy import Process
+import queue
+import threading
 import turtle
 
 
@@ -76,7 +76,7 @@ def updateScore(newScore):
     if scoreValue=="Score High":
         scoreValue = newScore
     else: # else add the new value of score to existing score
-        scoreValue+=newScore
+        scoreValue += newScore
 
     # Currently using this condition for some perfomance improvement
     # without this if we don't do the check and run the clear() and 
@@ -94,12 +94,17 @@ def updateScore(newScore):
 def moveRight():
     # mainLine.speed(mainLineSpeed)
     mainLine.forward(10)
+    x=mainLine.xcor()
+    # reset the mainLine to rightmost side
+    if x < -windowWidth:
+        mainLine.speed(0)
+        mainLine.setx(windowWidth)
 
 
 def moveBall():
 
     ########## LOGIC  ##########
-    ball.time+=0.4
+    ball.time+=0.5
     s = (ball.u)*(ball.time) - 0.5*(ball.g)*(ball.time**2)
 
 
@@ -114,6 +119,7 @@ def moveBall():
         else:   
             setVelocity(ball.jumpHeight/2)
     
+    # -90 is currently y - coordinate of ground
     ball.sety(-90+s) #move ball to next position
 
 
@@ -129,25 +135,124 @@ window.onkey(exitGame,'x')
 
 #### Keypress [0-9] by user to change ball jump height ######
 def setNextJump(n):
-    # print(f"pressed {n}")
+    # ground y coordinate = -90
+    # ground y coordinate = +90
+    # So total height for jump = 180px
+    # So , 180 distance for 10key presses [0-9] = 180/10 = 18 is unit ratio
+
+    # If we consider 10 as the total heigh
+    # and if users presses 6, it should jump till 60%
+    # which is (60% of 180px) 
+    #           = 6*18 = (n*18)px
     ball.nextHeight=n*18
+
+
 
 for num in range(10):
     window.onkeypress(lambda n=num: setNextJump(n), str(num))
 
 
+############## Old main code for running the game ##############
+# while True:
+#     moveRight()
+#     moveBall()
 
-while True:
-    moveRight()
-    moveBall()
-
-    # update the scoreboard
-    updateScore(ball.time)
-    x=mainLine.xcor()
-    # reset the mainLine to rightmost side
-    if x < -windowWidth:
-        mainLine.speed(0)
-        mainLine.setx(windowWidth)
+#     # update the scoreboard
+#     updateScore(int(ball.time))
+#     x=mainLine.xcor()
+#     # reset the mainLine to rightmost side
+#     if x < -windowWidth:
+#         mainLine.speed(0)
+#         mainLine.setx(windowWidth)
 
 
-# turtle.done()
+
+
+
+############## New code for running main game ##############
+
+# Problem : We want that moveRight and moveBall functions runs simultaneouslu
+# and independently of each other
+# So, multithreading is one of the technique to do this.
+# First I broke the actual while loop to 2 independent loop 
+# one is in "moveRightHelper" and another is in "moveBallHelper"
+# 
+# Then using multithreading we can simutaneously run these codes
+
+
+# These two queues will hold our upcoming moves 
+mainLineQueue = queue.Queue(5)  # It holds recent 5 moves for mainLine
+ballQueue = queue.Queue(5)  # It holds recent 5 moves for ball
+
+
+
+# This functions pushes moveRight function to the queue "mainLineQueue" for 
+# further processing. About this is mentioned below
+# IT WILL RUN IN A SEPARATE THREAD
+def moveRightHelper():
+    while True:
+        mainLineQueue.put(moveRight)
+
+# Same thing is done by this function, moves the moveBall function to
+# "ballQueue" queue
+# IT WILL RUN IN A SEPARATE THREAD
+def moveBallHelper():
+    while True:
+        ballQueue.put(moveBall)
+
+
+
+# This is where main work is done
+
+# In this process phase we'll process the functions waiting 
+# for execution in queue mainLineQueue. 
+# IT WILL RUN IN A SEPARATE THREAD
+def processMainLineQueue():
+    while mainLineQueue:
+        (mainLineQueue.get())()
+    
+    # This is just a delay between query for slow systems 
+    if threading.active_count() > 1:
+        turtle.ontimer(processMainLineQueue,100)
+
+
+# Same here for ball run the functions in queue one by one
+# IT WILL RUN IN A SEPARATE THREAD
+def processBallQueue():
+    while ballQueue:
+        (ballQueue.get())()
+    
+    if threading.active_count() > 1:
+        turtle.ontimer(processBallQueue,100)
+
+
+
+# These are the THREADS
+
+# Currently There are FOUR THREADS
+# t1    ->  Thread for moveRightHelper, it will queue recent moveRight functions for execution
+# t2    ->  Thread for moveBallHelper, same as above but for the ball
+# p1    ->  Thread for processing mainline queue, executes the functions created by t1
+# p2    ->  Thread for processing ball queue, executes the functions created by t2
+
+t1 = threading.Thread(target=moveRightHelper)
+t1.daemon = True
+t1.start()
+
+
+t2 = threading.Thread(target=moveBallHelper)
+t2.daemon = True
+t2.start()
+
+
+p1 = threading.Thread(target=processMainLineQueue)
+p1.daemon= True
+p1.start()
+
+
+p2 = threading.Thread(target=processBallQueue)
+p2.daemon= True
+p2.start()
+
+
+turtle.done()
